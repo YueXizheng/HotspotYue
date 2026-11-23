@@ -1,0 +1,14 @@
+# 编译中间产物
+obj/
+*.pdb
+*.user
+*.suo
+
+# 本机调试
+*.log
+_probe/
+
+# 系统文件
+Thumbs.db
+desktop.ini
+.DS_Store
