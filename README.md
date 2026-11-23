@@ -6,18 +6,6 @@ Win11 的移动热点被荣耀工作台之类的程序周期性掐断，这个�
 
 ![界面](screenshot.png)
 
-## 和分享里那套方案的区别
-
-分享里的方案是「C# 外壳 + PowerShell 脚本」双进程：C# 只负责显示，真正的检测和开关都在 `keepalive.ps1` 里。这个版本把 PowerShell 整个去掉了：
-
-| | 分享里的方案 | HotspotYue |
-|---|---|---|
-| 热点控制 | PowerShell 脚本调 WinRT | C# 直接调 `NetworkOperatorTetheringManager` |
-| 依赖 | `powershell.exe` + 脚本路径必须是纯英文 | 无，单 exe |
-| 异步处理 | 反射包装 `IAsyncOperation` | 自写 awaiter，`await` 直接用 |
-| 权限 | `requireAdministrator`，每次弹 UAC | **实测标准用户即可**，不弹 UAC |
-| 开机自启 | 未涉及 | HKCU Run，登录静默启动到托盘 |
-| 日志 | 界面显示 | 界面显示 + 2000 行环形缓冲 + 可导出 / 一键清空 |
 
 ## 目录结构
 
