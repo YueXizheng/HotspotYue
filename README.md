@@ -56,7 +56,7 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 
 ## 实测记录
 
-在本机（Windows 11 家庭版 26300）上：
+在Windows11上：
 
 - 标准用户调用 `StartTetheringAsync` / `StopTetheringAsync` 均返回 `Success`，无需管理员权限；
 - 外部停止热点模拟被掐断，应用在 6.7 秒内完成 `Off → InTransition → On`；
