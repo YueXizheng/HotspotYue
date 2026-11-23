@@ -2,7 +2,7 @@
 
 Win11 的移动热点被荣耀工作台之类的程序周期性掐断，这个工具负责盯着它、发现断了就立刻拉回来。
 
-单文件 exe，**32 KB，零依赖**（.NET Framework 4.8 是 Win11 自带的），双击即用，不需要装 .NET SDK、不需要 Visual Studio。
+单文件 exe，**34 KB，零依赖**（.NET Framework 4.8 是 Win11 自带的），双击即用，不需要装 .NET SDK、不需要 Visual Studio。
 
 ![界面](screenshot.png)
 
@@ -17,7 +17,7 @@ Win11 的移动热点被荣耀工作台之类的程序周期性掐断，这个�
 | 异步处理 | 反射包装 `IAsyncOperation` | 自写 awaiter，`await` 直接用 |
 | 权限 | `requireAdministrator`，每次弹 UAC | **实测标准用户即可**，不弹 UAC |
 | 开机自启 | 未涉及 | HKCU Run，登录静默启动到托盘 |
-| 日志 | 界面显示 | 界面显示 + 2000 行环形缓冲 + 可导出 |
+| 日志 | 界面显示 | 界面显示 + 2000 行环形缓冲 + 可导出 / 一键清空 |
 
 ## 目录结构
 
@@ -46,6 +46,7 @@ HotspotYue/
 2. 点「开启保活」：会立刻打开热点，之后每 5 秒检查一次。
 3. 关掉窗口只是收进托盘，保活继续；要真正退出，右键托盘图标 →「退出」。
 4. 勾选「开机自动启动」：写当前用户的 Run 项，下次登录自动进托盘并开始保活。
+5. 「清空日志」一键清空内存日志和界面显示（托盘右键菜单里也有同名项）。
 
 托盘图标颜色：绿色 = 热点正常，红色 = 热点断开正在恢复，灰色 = 保活已停止。
 
@@ -54,7 +55,7 @@ HotspotYue/
 - **检测周期**：默认 5 秒，可调 2–60 秒。运行中改周期立即生效。
 - **退避**：连续恢复失败 3 次后，间隔自动拉长到 30 秒，避免和抢热点的程序死循环对打。
 - **恢复**：`StartTetheringAsync`，成功后托盘气泡提示一次；失败时只记日志，不弹窗骚扰。
-- **日志**：只在状态变化时写，最多保留 2000 行，默认完全不落盘。需要时点「导出日志」。
+- **日志**：只在状态变化时写，**内核缓冲和界面显示都按 2000 行封顶**，超出后从最旧的行开始丢；默认完全不落盘。需要时点「导出日志」，想立刻归零点「清空日志」。
 - **单实例**：重复双击不会开出第二个进程，而是把已有窗口叫出来。
 
 ## 重新编译
@@ -72,6 +73,22 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 - 标准用户调用 `StartTetheringAsync` / `StopTetheringAsync` 均返回 `Success`，无需管理员权限；
 - 外部停止热点模拟被掐断，应用在 6.7 秒内完成 `Off → InTransition → On`；
 - 应用日志对应记录：`状态变化：已开启 → 已关闭` → `[警告] 检测到热点未开启，正在自动恢复…` → `[正常] 热点已重新开启。`
+- 日志裁剪：写入 2102 行后，界面与内核都稳定在 2000 行，首行变为第 102 行（最旧的 102 行被丢弃）；
+- 清空日志：点击后界面只剩一行 `[提示] 日志已清空。`
+
+### 开发笔记：ReadOnly 的坑
+
+`RichTextBox.ReadOnly = true` 时，给 `SelectedText` 赋值会被**静默忽略**——不报错，也不改内容。所以删旧行时必须临时把 `ReadOnly` 置 false，删完再恢复，否则计数器说"已裁剪 2000 行"、界面却还在无限增长。
+
+另外，`GetFirstCharIndexFromLine` 按**显示行**计数，开了 `WordWrap` 后和逻辑行对不上，裁剪位置要用 `\n` 自己数。
+
+## 调试用编译开关
+
+需要压力测试日志裁剪时，可以用 `LOGTEST` 宏编一个会自灌 2100 行日志的版本（不会进入正式产物）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build.ps1 -Output .\bin\HotspotYue.logtest.exe -Define LOGTEST
+```
 
 ## 已知限制
 
@@ -79,5 +96,9 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 - 没有网络连接时热点无法开启，界面会显示「读取失败」并记录原因。
 - 断线恢复靠轮询，所以最短恢复延迟等于检测周期。
 - 想彻底清除：取消勾选自启 + 删除 exe 本体即可，程序不写任何注册表以外的位置。
+
+## 许可证
+
+[MIT](LICENSE)
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)

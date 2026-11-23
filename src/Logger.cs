@@ -16,6 +16,23 @@ namespace HotspotYue
 
         public static event Action<string> LineAdded;
 
+        /// <summary>日志被清空时触发，界面据此清掉文本框里的内容。</summary>
+        public static event Action Cleared;
+
+        public static void Clear()
+        {
+            lock (SyncRoot)
+            {
+                Lines.Clear();
+            }
+
+            Action handler = Cleared;
+            if (handler != null)
+            {
+                handler();
+            }
+        }
+
         public static void Write(string message)
         {
             string line = DateTime.Now.ToString("HH:mm:ss") + "  " + message;

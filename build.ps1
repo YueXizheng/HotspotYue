@@ -7,7 +7,8 @@
 # 用法：powershell -ExecutionPolicy Bypass -File .\build.ps1
 
 param(
-    [string]$Output = ""
+    [string]$Output = "",
+    [string]$Define = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -84,6 +85,10 @@ $arguments = @(
 
 foreach ($source in $sources) {
     $arguments += $source
+}
+
+if (-not [string]::IsNullOrEmpty($Define)) {
+    $arguments = @("/define:" + $Define) + $arguments
 }
 
 Write-Host "编译 " $sources.Count " 个源文件..."

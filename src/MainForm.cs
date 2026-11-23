@@ -31,6 +31,7 @@ namespace HotspotYue
         private readonly Label _lblSeconds = new Label();
         private readonly CheckBox _chkAutostart = new CheckBox();
         private readonly Button _btnExport = new Button();
+        private readonly Button _btnClear = new Button();
         private readonly Label _lblLogCaption = new Label();
         private readonly RichTextBox _log = new RichTextBox();
 
@@ -46,6 +47,7 @@ namespace HotspotYue
         private bool _offEpisodeLogged;
 
         private int _failures;
+        private int _logLineCount;
         private string _lastState = "";
         private HotspotSnapshot _lastSnapshot = new HotspotSnapshot();
         private DateTime _runningSince = DateTime.Now;
@@ -59,6 +61,7 @@ namespace HotspotYue
             BuildTray();
 
             Logger.LineAdded += OnLogLine;
+            Logger.Cleared += OnLogCleared;
 
             _timer.Interval = DefaultIntervalSeconds * 1000;
             _timer.Tick += OnTimerTick;
@@ -72,6 +75,14 @@ namespace HotspotYue
             {
                 Logger.Write("提示：勾选“开机自动启动”后，登录 Windows 就会自动开始守护。");
             }
+
+#if LOGTEST
+            for (int i = 0; i < 2100; i++)
+            {
+                Logger.Write("[测试] 第 " + i + " 行");
+            }
+            Logger.Write("[测试] 界面行数=" + _logLineCount + " 内核行数=" + Logger.Count);
+#endif
         }
 
         // ---------------------------------------------------------------
@@ -158,11 +169,18 @@ namespace HotspotYue
             _chkAutostart.CheckedChanged += OnAutostartChecked;
 
             _btnExport.Text = "导出日志";
-            _btnExport.Size = new Size(110, 40);
+            _btnExport.Size = new Size(96, 40);
             _btnExport.FlatStyle = FlatStyle.Flat;
             _btnExport.FlatAppearance.BorderColor = Color.FromArgb(190, 196, 208);
             _btnExport.BackColor = Color.FromArgb(252, 252, 254);
             _btnExport.Click += OnExportClick;
+
+            _btnClear.Text = "清空日志";
+            _btnClear.Size = new Size(96, 40);
+            _btnClear.FlatStyle = FlatStyle.Flat;
+            _btnClear.FlatAppearance.BorderColor = Color.FromArgb(190, 196, 208);
+            _btnClear.BackColor = Color.FromArgb(252, 252, 254);
+            _btnClear.Click += OnClearClick;
 
             controls.Controls.Add(_btnToggle);
             controls.Controls.Add(_lblInterval);
@@ -170,11 +188,15 @@ namespace HotspotYue
             controls.Controls.Add(_lblSeconds);
             controls.Controls.Add(_chkAutostart);
             controls.Controls.Add(_btnExport);
+            controls.Controls.Add(_btnClear);
 
-            controls.Resize += delegate
+            EventHandler layoutButtons = delegate
             {
                 _btnExport.Left = controls.Width - _btnExport.Width;
+                _btnClear.Left = _btnExport.Left - 8 - _btnClear.Width;
             };
+            controls.Resize += layoutButtons;
+            controls.HandleCreated += layoutButtons;
 
             Panel caption = new Panel();
             caption.Dock = DockStyle.Top;
@@ -232,6 +254,9 @@ namespace HotspotYue
             ToolStripMenuItem exportItem = new ToolStripMenuItem("导出日志…");
             exportItem.Click += delegate { ExportLogs(); };
 
+            ToolStripMenuItem clearItem = new ToolStripMenuItem("清空日志");
+            clearItem.Click += delegate { ClearLogs(); };
+
             ToolStripMenuItem exitItem = new ToolStripMenuItem("退出");
             exitItem.Click += delegate
             {
@@ -244,6 +269,7 @@ namespace HotspotYue
             _trayMenu.Items.Add(toggleItem);
             _trayMenu.Items.Add(autoItem);
             _trayMenu.Items.Add(exportItem);
+            _trayMenu.Items.Add(clearItem);
             _trayMenu.Items.Add(new ToolStripSeparator());
             _trayMenu.Items.Add(exitItem);
             _trayMenu.Opening += delegate { SyncTrayMenu(); };
@@ -625,8 +651,100 @@ namespace HotspotYue
             _log.SelectionLength = 0;
             _log.SelectionColor = color;
             _log.AppendText(line + Environment.NewLine);
+            _logLineCount++;
+
+            TrimLogBox();
+
             _log.SelectionStart = _log.TextLength;
             _log.ScrollToCaret();
+        }
+
+        /// <summary>
+        /// 界面上的文本框同样按 2000 行封顶，超出后从最旧的行开始丢，
+        /// 否则内核只留 2000 行、界面却一直长，等于没清理。
+        /// </summary>
+        private void TrimLogBox()
+        {
+            if (_logLineCount <= Logger.Capacity)
+            {
+                return;
+            }
+
+            int remove = _logLineCount - Logger.Capacity;
+            int cut = IndexAfterLines(remove);
+            if (cut > 0)
+            {
+                // ReadOnly = true 时 RichTextBox 会静默忽略 SelectedText 赋值，
+                // 所以这里临时放开，删完再恢复。
+                bool readOnly = _log.ReadOnly;
+                _log.ReadOnly = false;
+                try
+                {
+                    _log.Select(0, cut);
+                    _log.SelectedText = string.Empty;
+                }
+                finally
+                {
+                    _log.ReadOnly = readOnly;
+                }
+            }
+
+            _logLineCount -= remove;
+            if (_logLineCount < 0)
+            {
+                _logLineCount = 0;
+            }
+        }
+
+        /// <summary>按逻辑行（\n）计数，避免 WordWrap 换行导致行列错位。</summary>
+        private int IndexAfterLines(int count)
+        {
+            string text = _log.Text;
+            int index = 0;
+            for (int i = 0; i < count; i++)
+            {
+                int next = text.IndexOf('\n', index);
+                if (next < 0)
+                {
+                    return text.Length;
+                }
+                index = next + 1;
+            }
+            return index;
+        }
+
+        private void OnClearClick(object sender, EventArgs e)
+        {
+            ClearLogs();
+        }
+
+        private void ClearLogs()
+        {
+            Logger.Clear();
+            Logger.Write("[提示] 日志已清空。");
+        }
+
+        private void OnLogCleared()
+        {
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            try
+            {
+                if (InvokeRequired)
+                {
+                    BeginInvoke(new Action(OnLogCleared));
+                    return;
+                }
+                _log.Clear();
+                _logLineCount = 0;
+            }
+            catch (Exception)
+            {
+                // 窗体关闭过程中忽略。
+            }
         }
 
         private void OnExportClick(object sender, EventArgs e)
@@ -832,6 +950,7 @@ namespace HotspotYue
             }
 
             Logger.LineAdded -= OnLogLine;
+            Logger.Cleared -= OnLogCleared;
 
             try
             {
