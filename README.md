@@ -4,6 +4,20 @@ Win11 的移动热点被荣耀工作台之类的程序周期性掐断，这个�
 
 单文件 exe，**34 KB，零依赖**（.NET Framework 4.8 是 Win11 自带的），双击即用，不需要装 .NET SDK、不需要 Visual Studio。
 
+## 下载
+
+[![下载 HotspotYue.exe](https://img.shields.io/badge/下载-HotspotYue.exe-2ea44f?style=flat-square&logo=windows11&logoColor=white)](https://github.com/YueXizheng/HotspotYue/releases/latest/download/HotspotYue.exe)
+
+- 直链：<https://github.com/YueXizheng/HotspotYue/releases/latest/download/HotspotYue.exe>
+- 版本页：[Releases](https://github.com/YueXizheng/HotspotYue/releases)
+- 当前版本：`v1.1.0`
+
+下载后双击即可运行，无需安装。文件校验：
+
+```
+SHA256  39106CFA9D68FB369E412369F660F78BF61C9386DBA2611F44E3977BAD8A7FAD
+```
+
 ![界面](screenshot.png)
 
 
